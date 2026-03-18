@@ -34,7 +34,13 @@ def listar_usuarios():
         Response: JSON con la lista de usuarios (cada uno con id y nombre).
         Código 200.
     """
-    return jsonify({"error": "No implementado"}), 501
+    if USUARIOS is None:
+        return jsonify([]), 200
+    usuarios = []
+    for usuario in USUARIOS:
+        usuario.pop("password", None) # es para no batir las csñas jajs
+        usuarios.append(usuario)
+    return jsonify(usuarios), 200
 
 
 def obtener_usuario(usuario_id: int):
@@ -47,7 +53,11 @@ def obtener_usuario(usuario_id: int):
         Response: JSON del usuario (id, nombre) si existe; 200.
         Si no existe: JSON con error y código 404.
     """
-    return jsonify({"error": "No implementado"}), 501
+
+    usuario = next((u for u in USUARIOS if u["id"] == usuario_id), None)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    return jsonify(usuario), 200
 
 
 def crear_usuario():
@@ -86,7 +96,17 @@ def actualizar_usuario(usuario_id: int):
     Returns:
         Response: JSON del usuario actualizado y 200; 404 si no existe, 400 si body inválido.
     """
-    return jsonify({"error": "No implementado"}), 501
+    usuario = next((u for u in USUARIOS if u["id"] == usuario_id), None)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    datos = request.json
+    if not datos or "nombre" not in datos:
+        return jsonify({"error": "Datos inválidos: se requiere nombre"}), 400
+    
+    usuario["nombre"] = datos["nombre"]
+    _persist_usuarios()
+    return jsonify(usuario), 200
 
 
 def eliminar_usuario(usuario_id: int):
@@ -98,4 +118,12 @@ def eliminar_usuario(usuario_id: int):
     Returns:
         Response: JSON con mensaje de éxito y 200; 404 si el usuario no existe.
     """
-    return jsonify({"error": "No implementado"}), 501
+    usuario = next((u for u in USUARIOS if u["id"] == usuario_id), None)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+    USUARIOS.remove(usuario)
+    _persist_usuarios()
+    return jsonify({"mensaje": "Usuario eliminado"}), 200
+
+
+
