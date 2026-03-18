@@ -114,7 +114,6 @@ def listar_juegos_usuario(usuario_id: int):
     ordenar = request.args.get("ordenar", "nombre") # nombre por defecto
     orden = request.args.get("orden", "asc") # ascendent por defecto
 
-    # Llamamos a la función que la cátedra te dejó armada en src/filtros.py
     lista_final = filtros.filtrar_y_ordenar(
         items=lista_enriquecida,
         genero=genero,
@@ -171,7 +170,42 @@ def agregar_juego_usuario(usuario_id: int):
         Response: JSON del ítem creado (enriquecido) y 201; 400 si falta campo, 404 si usuario
         o juego no existe, 409 si el juego ya está en la lista.
     """
-    return jsonify({"error": "No implementado"}), 501
+
+    error_response, valid_data = _validar_body_agregar_juego()
+    if error_response:
+        return error_response  # Ya devuelve el jsonify con el error 400
+
+    juego_id, req = valid_data
+
+    lista, existente = _lista_y_existente(usuario_id, juego_id)
+    
+    if lista is None:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+        
+    if existente is not None:
+        return jsonify({"error": "El juego ya está en la lista"}), 409
+
+    # La funcion obtener_juego aun no la implementamos!
+    juego = wikidata.obtener_juego(juego_id)
+    if not juego:
+        return jsonify({"error": "Juego no encontrado en catálogo ni en Wikidata"}), 404
+
+    # 4. Crear el nuevo ítem con los datos del request y la fecha actual
+    nuevo_item = {
+        "juego_id": juego_id,
+        "tengo": bool(req["tengo"]),
+        "quiero": bool(req["quiero"]),
+        "jugado": bool(req["jugado"]),
+        "me_gusta": bool(req["me_gusta"]),
+        "fecha_agregado": datetime.now(timezone.utc).isoformat()
+    }
+
+    # Agregamos a la lista en memoria y forzamos persistencia 
+    lista.append(nuevo_item)
+    _persist_listas()
+
+    item_enriquecido = _enriquecer_item(nuevo_item)
+    return jsonify(item_enriquecido), 201
 
 
 def actualizar_juego_usuario(usuario_id: int, juego_id: str):
