@@ -190,7 +190,6 @@ def agregar_juego_usuario(usuario_id: int):
     if not juego:
         return jsonify({"error": "Juego no encontrado en catálogo ni en Wikidata"}), 404
 
-    # 4. Crear el nuevo ítem con los datos del request y la fecha actual
     nuevo_item = {
         "juego_id": juego_id,
         "tengo": bool(req["tengo"]),
@@ -220,7 +219,26 @@ def actualizar_juego_usuario(usuario_id: int, juego_id: str):
     Returns:
         Response: JSON del ítem actualizado y 200; 404 si usuario o juego en lista no existe.
     """
-    return jsonify({"error": "No implementado"}), 501
+    lista, existente = _lista_y_existente(usuario_id, juego_id)
+    
+    if lista is None or existente is None:
+        return jsonify({"error": "Usuario o juego no encontrado"}), 404
+
+    req = request.json or {}
+
+    if "tengo" in req:
+        existente["tengo"] = bool(req["tengo"])
+    if "quiero" in req:
+        existente["quiero"] = bool(req["quiero"])
+    if "jugado" in req:
+        existente["jugado"] = bool(req["jugado"])
+    if "me_gusta" in req:
+        existente["me_gusta"] = bool(req["me_gusta"])
+
+    _persist_listas()
+
+    item_enriquecido = _enriquecer_item(existente)
+    return jsonify(item_enriquecido), 200
 
 
 def eliminar_juego_usuario(usuario_id: int, juego_id: str):
@@ -233,4 +251,13 @@ def eliminar_juego_usuario(usuario_id: int, juego_id: str):
     Returns:
         Response: JSON con mensaje de éxito y 200; 404 si usuario o juego en lista no existe.
     """
-    return jsonify({"error": "No implementado"}), 501
+    lista, existente = _lista_y_existente(usuario_id, juego_id)
+    
+    if lista is None or existente is None:
+        return jsonify({"error": "Usuario o juego no encontrado"}), 404
+
+    lista.remove(existente)
+    
+    _persist_listas()
+
+    return jsonify({"mensaje": "Juego eliminado de la lista"}), 200
