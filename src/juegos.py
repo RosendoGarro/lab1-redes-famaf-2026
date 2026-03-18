@@ -44,7 +44,15 @@ def _lista_usuario(usuario_id: int):
         Lista de ítems (dict con juego_id, tengo, quiero, jugado, me_gusta, fecha_agregado)
         o None si el usuario no existe.
     """
-    return None
+    
+    usuario = next((u for u in USUARIOS if u["id"] == usuario_id), None)
+
+    if not usuario:
+        return None
+
+    # Notar que esto puede devolver una lista vacía!
+    return LISTAS_JUEGOS.get(usuario_id, [])
+
 
 
 def _enriquecer_item(item: dict) -> dict | None:
@@ -87,7 +95,35 @@ def listar_juegos_usuario(usuario_id: int):
         Response: JSON con lista de juegos (cada uno con id, nombre, flags, etc.) y 200;
         404 si el usuario no existe.
     """
-    return jsonify({"error": "No implementado"}), 501
+
+    # Lista cruda de los juegos del usuario. Cada item en la lista es un 
+    # diccionario mapeando juego_id -> status, donde status es 
+    # {tengo, quiero, jugado, me gusta}
+    lista_cruda = _lista_usuario(usuario_id)
+
+    if lista_cruda is None:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    lista_enriquecida = []
+    for item in lista_cruda:
+        item_completo = _enriquecer_item(item)
+        if item_completo is not None:  # enriquecer item puede tirar None
+            lista_enriquecida.append(item_completo)
+
+    genero = request.args.get("genero")
+    ordenar = request.args.get("ordenar", "nombre") # nombre por defecto
+    orden = request.args.get("orden", "asc") # ascendent por defecto
+
+    # Llamamos a la función que la cátedra te dejó armada en src/filtros.py
+    lista_final = filtros.filtrar_y_ordenar(
+        items=lista_enriquecida,
+        genero=genero,
+        ordenar=ordenar,
+        orden=orden,
+        ordenes_validos=filtros.ORDEN_VALIDOS_LISTA
+    )
+
+    return jsonify(lista_final), 200
 
 
 def _validar_body_agregar_juego():
