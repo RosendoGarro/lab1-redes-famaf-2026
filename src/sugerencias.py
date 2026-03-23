@@ -14,11 +14,6 @@ Qué hace:
     - _filtrar_candidatos_por_genero: filtra por género usando el catálogo.
     - _candidatos_sugerencia: combina ambos; None si el usuario no existe.
     - sugerir_juego: el endpoint; 404 si usuario no existe o no hay candidatos.
-
-Qué se espera que hagas:
-    En el kickstarter la lógica de sugerir_juego viene con stub. Implementá
-    usando las helpers _candidatos_sugerencia y el catálogo para enriquecer
-    el JSON de respuesta (id, nombre, descripcion, genero, lanzamiento, plataforma).
 """
 
 import random
@@ -54,9 +49,12 @@ def _filtrar_candidatos_por_genero(candidatos: list[dict], genero: str | None) -
     """
     if not genero:
         return candidatos
+    
+    # comparamos ignorando mayúsculas/minúsculas para ser más robustos y evitar que el usuario tenga que escribir exactamente el género como está en el catálogo
+    genero_buscado = genero.lower()
     return [
         i for i in candidatos
-        if CATALOGO_JUEGOS.get(i["juego_id"], {}).get("genero") == genero
+        if CATALOGO_JUEGOS.get(i["juego_id"], {}).get("genero", "").lower() == genero_buscado
     ]
 
 
@@ -88,4 +86,38 @@ def sugerir_juego(usuario_id: int):
         Response: JSON con id, nombre, descripcion, genero, lanzamiento, plataforma y 200;
         404 si el usuario no existe o no hay juegos que cumplan el criterio.
     """
-    return jsonify({"error": "No implementado"}), 501
+    # obtenemos el parametro opcional de la URL
+    genero = request.args.get("genero")
+    
+    # buscamos los candidatos usando las funciones helper
+    candidatos = _candidatos_sugerencia(usuario_id, genero)
+    
+    # manejamos los casos de error "usuario no existe" y "no hay candidatos" 404
+    if candidatos is None:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+        
+    if not candidatos:
+        return jsonify({"error": "No hay juegos para sugerir con ese criterio"}), 404
+        
+    # elegimos un juego al azar de la lista filtrada
+    item_elegido = random.choice(candidatos)
+    
+    # buscamos la info del juego en el catalogo para enriquecer la respuesta
+    juego_cat = CATALOGO_JUEGOS.get(item_elegido["juego_id"], {})
+    
+    # armamos el JSON final respetando el esquema del contrato de la api
+    resultado = {
+        "id": item_elegido["juego_id"],
+        "nombre": juego_cat.get("nombre", ""),
+        "genero": juego_cat.get("genero", ""),
+        "lanzamiento": juego_cat.get("lanzamiento", ""),
+        "plataforma": juego_cat.get("plataforma", ""),
+        "descripcion": juego_cat.get("descripcion", ""),
+        "tengo": item_elegido.get("tengo", False),
+        "quiero": item_elegido.get("quiero", False),
+        "jugado": item_elegido.get("jugado", False),
+        "me_gusta": item_elegido.get("me_gusta", False),
+        "fecha_agregado": item_elegido.get("fecha_agregado", "")
+    }
+    
+    return jsonify(resultado), 200
