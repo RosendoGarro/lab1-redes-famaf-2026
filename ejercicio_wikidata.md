@@ -23,11 +23,12 @@
 **Comando curl:**
 `curl -A "LabRedes2026/1.0" "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=mario&language=es&limit=5&format=json" | python3 -m json.tool`
 
-*La lista search tiene exactamente 5 elementos
+* La lista search tiene exactamente 5 elementos
 * El primer resultado tiene el id [Q12379] y su descripcion es [fictional character in the Mario video game franchise].
 
 ## Ejercicio Propio 4 — [Modificar comando]
 **Consigna:** [maximo 2 resultados y Wikidata tiene que traer exactamente eso: primero el videojuego original de 2011 y segundo la franquicia entera de medios].
+
 **Comando curl:**
 `[curl -A "LabRedes2026/1.0" "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=minecraft&language=en&limit=2&format=json" | python3 -m json.tool]`
 
