@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import os
 from uuid import uuid4
+from datetime import datetime, timezone, timedelta
 
 from flask import jsonify
+
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import auth_common
 from .store import guardar_credenciales, actualizar_token
@@ -54,8 +57,8 @@ def registrar_usuario_auth():
 
     usuario = auth_common.crear_usuario_basico(nombre)
 
-    # INSEGURO: password_hash == password en texto plano.
-    password_hash = password
+    # Hasheamos la contraseña antes de guardarla
+    password_hash = generate_password_hash(password)
     guardar_credenciales(usuario["id"], username, password_hash)
 
     return jsonify(usuario), 201
@@ -79,13 +82,16 @@ def login():
         return error
     assert cred is not None
 
-    # INSEGURO: compara texto plano.
-    if cred["password_hash"] != password:
+    # Comparamos usando el hash seguro
+    if not check_password_hash(cred["password_hash"], password):
         return jsonify({"error": "Credenciales inválidas"}), 401
 
     token = uuid4().hex
-    # INCOMPLETO: no se setea expiración real; queda NULL.
-    actualizar_token(cred["usuario_id"], token, None)
+    ttl = _token_ttl_minutes()
+    exp = datetime.now(timezone.utc) + timedelta(minutes=ttl)
+    # Guardamos el ISO en UTC con Z para compatibilidad con tests
+    exp_iso = exp.isoformat().replace("+00:00", "Z")
+    actualizar_token(cred["usuario_id"], token, exp_iso)
 
     return jsonify({"token": token})
 
@@ -104,5 +110,21 @@ def obtener_usuario_actual() -> int | None:
         return None
 
     usuario_id = data.get("usuario_id")
-    return int(usuario_id) if usuario_id is not None else None
+    exp = data.get("token_expira_en")
+    if not usuario_id or not exp:
+        return None
+
+    # Parse ISO that may end with Z
+    try:
+        if exp.endswith("Z"):
+            exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+        else:
+            exp_dt = datetime.fromisoformat(exp)
+    except Exception:
+        return None
+
+    if datetime.now(timezone.utc) > exp_dt:
+        return None
+
+    return int(usuario_id)
 
